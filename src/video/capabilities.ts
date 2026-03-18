@@ -33,7 +33,10 @@ interface MediaCapabilitiesLike {
 }
 
 export interface PlaybackEnvironment {
-  effectiveWidth: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  devicePixelRatio: number;
+  coverRequiredHeight: number;
   constrainedNetwork: boolean;
   saveData: boolean;
   effectiveType: string;
@@ -54,7 +57,10 @@ export function getPlaybackEnvironment(): PlaybackEnvironment {
 
   const effectiveType = connection?.effectiveType ?? 'unknown';
   const saveData = connection?.saveData === true;
-  const effectiveWidth = window.innerWidth * Math.min(window.devicePixelRatio || 1, 2);
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const devicePixelRatio = clamp(window.devicePixelRatio || 1, 1, 3);
+  const coverRequiredHeight = calculateCoverRequiredHeight(viewportWidth, viewportHeight, devicePixelRatio);
   const constrainedNetwork =
     saveData ||
     effectiveType === 'slow-2g' ||
@@ -62,7 +68,10 @@ export function getPlaybackEnvironment(): PlaybackEnvironment {
     effectiveType === '3g';
 
   return {
-    effectiveWidth,
+    viewportWidth,
+    viewportHeight,
+    devicePixelRatio,
+    coverRequiredHeight,
     constrainedNetwork,
     saveData,
     effectiveType,
@@ -121,4 +130,16 @@ function estimateBitrate(variant: VideoVariant): number {
   }
 
   return variant.height >= 1080 ? 5200000 : 2800000;
+}
+
+export function calculateCoverRequiredHeight(
+  viewportWidth: number,
+  viewportHeight: number,
+  devicePixelRatio: number,
+): number {
+  return Math.max(viewportHeight, viewportWidth * (9 / 16)) * clamp(devicePixelRatio, 1, 3);
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }

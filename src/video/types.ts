@@ -19,6 +19,29 @@ export interface VideoManifest {
   variants: VideoVariant[];
 }
 
+export interface VariantEvaluationDiagnostic {
+  variantId: string;
+  ladder: VideoLadder;
+  format: VideoFormat;
+  canPlay: boolean;
+  supported: boolean | null;
+  smooth: boolean | null;
+  powerEfficient: boolean | null;
+  rejectedReason: string | null;
+}
+
+export interface VariantSelectionDiagnostics {
+  preferredLadder: VideoLadder;
+  viewportWidth: number;
+  viewportHeight: number;
+  devicePixelRatio: number;
+  coverRequiredHeight: number;
+  constrainedNetwork: boolean;
+  saveData: boolean;
+  effectiveType: string;
+  evaluations: VariantEvaluationDiagnostic[];
+}
+
 export type DiagnosticEventName =
   | 'init'
   | 'variant-selected'
@@ -37,6 +60,7 @@ export interface VariantSelectionResult {
   variant: VideoVariant;
   reason: string;
   candidates: VideoVariant[];
+  diagnostics: VariantSelectionDiagnostics;
 }
 
 export interface PlaybackFailureContext {

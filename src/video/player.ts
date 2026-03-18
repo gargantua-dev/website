@@ -1,6 +1,6 @@
 import type { VideoPlayerConfig } from '../config/playerConfig';
 import { Diagnostics } from './diagnostics';
-import { getFallbackVariant, selectInitialVariant } from './selection';
+import { getFallbackSequence, selectInitialVariant } from './selection';
 import type { PlaybackFailureContext, VideoManifest, VideoVariant } from './types';
 
 interface PlayerElements {
@@ -30,6 +30,8 @@ export async function mountVideoPlayer(
   let pendingRecoveryTimeout: number | null = null;
   let playbackStarted = false;
   let stageReady = false;
+  const rejectedVariantIds = new Set<string>();
+  const unsupportedVariantIds = new Set<string>();
 
   const clearRecoveryTimeout = () => {
     if (pendingRecoveryTimeout !== null) {
@@ -47,33 +49,43 @@ export async function mountVideoPlayer(
     elements.stage.dataset.ready = 'true';
   };
 
+  const buildExcludedVariantIds = () => new Set([...unsupportedVariantIds, ...rejectedVariantIds]);
+
   const scheduleRecovery = (reason: string) => {
-    if (!activeVariant) {
+    const currentVariant = activeVariant;
+
+    if (!currentVariant) {
       return;
     }
 
     if (recoveryAttempts >= config.maxRecoveryAttemptsPerSession) {
       diagnostics.error('fatal-error', {
         reason: 'Limite de tentativas de recuperação atingido.',
-        activeVariant: activeVariant.id,
+        activeVariant: currentVariant.id,
       });
       return;
     }
 
     clearRecoveryTimeout();
     pendingRecoveryTimeout = window.setTimeout(() => {
-      const fallbackVariant = getFallbackVariant(activeVariant!, availableVariants);
+      rejectedVariantIds.add(currentVariant.id);
+      const excludedVariantIds = buildExcludedVariantIds();
+      const fallbackSequence = getFallbackSequence(currentVariant, availableVariants, excludedVariantIds);
+      const fallbackVariant = fallbackSequence[0] ?? null;
 
       diagnostics.warn('stall-detected', {
         reason,
-        activeVariant: activeVariant!.id,
+        activeVariant: currentVariant.id,
         recoveryAttempts,
+        fallbackChain: fallbackSequence.map((variant) => variant.id),
+        blockedVariants: Array.from(excludedVariantIds),
       });
 
       if (!fallbackVariant) {
         diagnostics.error('fatal-error', {
           reason: 'Nenhum fallback adicional disponível.',
-          activeVariant: activeVariant!.id,
+          activeVariant: currentVariant.id,
+          blockedVariants: Array.from(excludedVariantIds),
         });
         return;
       }
@@ -81,13 +93,18 @@ export async function mountVideoPlayer(
       recoveryAttempts += 1;
 
       diagnostics.warn('fallback-triggered', {
-        from: activeVariant!.id,
+        from: currentVariant.id,
         to: fallbackVariant.id,
         reason,
         recoveryAttempts,
+        fallbackChain: fallbackSequence.map((variant) => variant.id),
+        blockedVariants: Array.from(excludedVariantIds),
       });
 
-      void applyVariant(fallbackVariant, `fallback:${reason}`);
+      void applyVariant(fallbackVariant, `fallback:${reason}`, {
+        fallbackChain: fallbackSequence.map((variant) => variant.id),
+        blockedVariants: Array.from(excludedVariantIds),
+      });
     }, config.stallRecoveryThresholdMs);
   };
 
@@ -168,7 +185,10 @@ export async function mountVideoPlayer(
           return;
         }
 
-        const fallbackVariant = getFallbackVariant(activeVariant, availableVariants);
+        rejectedVariantIds.add(activeVariant.id);
+        const excludedVariantIds = buildExcludedVariantIds();
+        const fallbackSequence = getFallbackSequence(activeVariant, availableVariants, excludedVariantIds);
+        const fallbackVariant = fallbackSequence[0] ?? null;
 
         if (fallbackVariant) {
           recoveryAttempts += 1;
@@ -177,8 +197,13 @@ export async function mountVideoPlayer(
             to: fallbackVariant.id,
             reason: 'error-event',
             nativeCode: error?.code ?? null,
+            fallbackChain: fallbackSequence.map((variant) => variant.id),
+            blockedVariants: Array.from(excludedVariantIds),
           });
-          void applyVariant(fallbackVariant, 'error-event');
+          void applyVariant(fallbackVariant, 'error-event', {
+            fallbackChain: fallbackSequence.map((variant) => variant.id),
+            blockedVariants: Array.from(excludedVariantIds),
+          });
           return;
         }
       }
@@ -208,7 +233,11 @@ export async function mountVideoPlayer(
     }
   };
 
-  const applyVariant = async (variant: VideoVariant, reason: string) => {
+  const applyVariant = async (
+    variant: VideoVariant,
+    reason: string,
+    details: Record<string, unknown> = {},
+  ) => {
     activeVariant = variant;
     cancelStallMonitoring();
     elements.video.pause();
@@ -225,6 +254,7 @@ export async function mountVideoPlayer(
       height: variant.height,
       bitrate: variant.bitrate,
       reason,
+      ...details,
     });
 
     await playCurrentVideo(reason);
@@ -234,16 +264,28 @@ export async function mountVideoPlayer(
 
   const selection = await selectInitialVariant(elements.video, availableVariants);
 
+  for (const evaluation of selection.diagnostics.evaluations) {
+    if (
+      evaluation.rejectedReason === 'canPlayType=false' ||
+      evaluation.rejectedReason === 'mediaCapabilities.supported=false'
+    ) {
+      unsupportedVariantIds.add(evaluation.variantId);
+    }
+  }
+
   if (selection.candidates[0]?.id !== selection.variant.id) {
     diagnostics.warn('fallback-triggered', {
       from: selection.candidates[0]?.id,
       to: selection.variant.id,
       reason: 'initial-selection',
       details: selection.reason,
+      selectionDiagnostics: selection.diagnostics,
     });
   }
 
-  await applyVariant(selection.variant, selection.reason);
+  await applyVariant(selection.variant, selection.reason, {
+    selectionDiagnostics: selection.diagnostics,
+  });
 }
 
 function createPlayerElements(
