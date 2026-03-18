@@ -1,0 +1,69 @@
+:root {
+  color-scheme: dark;
+  background: #000;
+  --video-scale: 1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: #000;
+}
+
+body {
+  overflow: hidden;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.stage {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  contain: layout paint size style;
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.05), transparent 45%),
+    #000;
+}
+
+.stage__poster,
+.stage__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+  transform: translateZ(0) scale(var(--video-scale));
+}
+
+.stage__poster {
+  filter: saturate(1.02) contrast(1.02);
+  transition:
+    opacity 360ms ease-out,
+    transform 900ms ease-out;
+}
+
+.stage__video {
+  opacity: 0;
+  transition: opacity 280ms ease-out;
+}
+
+.stage[data-ready='true'] .stage__poster {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.stage[data-ready='true'] .stage__video {
+  opacity: 1;
+}
