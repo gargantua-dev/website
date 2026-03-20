@@ -4,14 +4,14 @@ import { getFallbackSequence, selectInitialVariant } from './selection';
 import type { PlaybackFailureContext, VideoManifest, VideoVariant } from './types';
 
 interface PlayerElements {
-  root: HTMLDivElement;
+  root: HTMLElement;
   stage: HTMLElement;
   poster: HTMLImageElement;
   video: HTMLVideoElement;
 }
 
 export async function mountVideoPlayer(
-  target: HTMLDivElement,
+  target: HTMLElement,
   manifest: VideoManifest,
   config: VideoPlayerConfig,
 ): Promise<void> {
@@ -164,6 +164,14 @@ export async function mountVideoPlayer(
     });
 
     elements.video.addEventListener('error', () => {
+      if (!activeVariant) {
+        diagnostics.warn('playback-error', {
+          reason: 'Erro antes da variante inicial ser definida.',
+          nativeCode: elements.video.error?.code ?? null,
+        });
+        return;
+      }
+
       const error = elements.video.error;
       const failureContext: PlaybackFailureContext = {
         reason: 'Erro nativo do elemento de vídeo.',
@@ -289,11 +297,11 @@ export async function mountVideoPlayer(
 }
 
 function createPlayerElements(
-  target: HTMLDivElement,
+  target: HTMLElement,
   posterUrl: string,
   config: VideoPlayerConfig,
 ): PlayerElements {
-  const stage = document.createElement('main');
+  const stage = document.createElement('div');
   stage.className = 'stage';
   stage.style.setProperty('--video-scale', String(config.zoom));
 

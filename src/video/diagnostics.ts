@@ -1,12 +1,12 @@
 import type { VideoPlayerConfig } from '../config/playerConfig';
-import type { DiagnosticEventName, DiagnosticEventPayload } from './types';
+import type { DiagnosticEventName, DiagnosticPayloadMap } from './types';
 
 const PREFIX = '[gargantua-player]';
 
 export class Diagnostics {
   constructor(private readonly config: VideoPlayerConfig) {}
 
-  info(event: DiagnosticEventName, payload: DiagnosticEventPayload = {}): void {
+  info<E extends DiagnosticEventName>(event: E, payload: DiagnosticPayloadMap[E]): void {
     if (!this.config.enableConsoleDiagnostics) {
       return;
     }
@@ -14,7 +14,7 @@ export class Diagnostics {
     console.info(PREFIX, event, payload);
   }
 
-  warn(event: DiagnosticEventName, payload: DiagnosticEventPayload = {}): void {
+  warn<E extends DiagnosticEventName>(event: E, payload: DiagnosticPayloadMap[E]): void {
     if (!this.config.enableConsoleDiagnostics) {
       return;
     }
@@ -22,7 +22,7 @@ export class Diagnostics {
     console.warn(PREFIX, event, payload);
   }
 
-  error(event: DiagnosticEventName, payload: DiagnosticEventPayload = {}): void {
+  error<E extends DiagnosticEventName>(event: E, payload: DiagnosticPayloadMap[E]): void {
     if (!this.config.enableConsoleDiagnostics) {
       return;
     }

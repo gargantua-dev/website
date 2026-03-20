@@ -294,9 +294,14 @@ function buildSelectionReason(input: {
 }
 
 function getLastResortVariant(variants: VideoVariant[]): VideoVariant {
-  return (
-    variants.find((variant) => variant.ladder === '720p' && variant.format === 'h264-mp4') ??
-    variants.find((variant) => variant.ladder === '720p') ??
-    variants[variants.length - 1]
-  );
+  const variant =
+    variants.find((v) => v.ladder === '720p' && v.format === 'h264-mp4') ??
+    variants.find((v) => v.ladder === '720p') ??
+    variants.at(-1);
+
+  if (!variant) {
+    throw new Error('O manifesto de vídeo está vazio — não é possível determinar um fallback final.');
+  }
+
+  return variant;
 }

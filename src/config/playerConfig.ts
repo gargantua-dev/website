@@ -9,7 +9,7 @@ export interface VideoPlayerConfig {
 export const playerConfig: VideoPlayerConfig = {
   zoom: 1,
   playbackRate: 1,
-  enableConsoleDiagnostics: true,
+  enableConsoleDiagnostics: import.meta.env.DEV,
   stallRecoveryThresholdMs: 1600,
   maxRecoveryAttemptsPerSession: 2,
 };
